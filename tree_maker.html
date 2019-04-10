@@ -1,0 +1,428 @@
+<!-- alt 4, 4 best collapse -->
+<html>
+	<head>
+		<meta name='description' content='Enter array representation of your tree and the page will paint it.'/>
+		<title>An N-ary Tree Painter</title>
+		<style>
+			* { font: 20px Arial Unicode MS; letter-spacing: 2px; }
+			input { border-radius: 4px; margin: 0.20% 0px; }
+			span { color: red; font-weight: 900; }
+			td, th { border: 1px solid black; text-align: center; padding: 4px; }
+			th { font: bold 20px consolas; }
+			table { border-collapse: collapse; }
+			canvas { border: 0px solid black; }
+			.anHr { border-top: 1px solid lightgrey; margin: 20px 0px; }
+			#output .anHr:nth-of-type(1) { display: none; }
+			.hideHelp { display: none; }
+            .hideAna > .analysis { display: none; }
+            .hideBut input[type=button] { display: none; }
+			pre { font: 20px Lucida Console; letter-spacing: 2px; }
+		</style>
+	</head>
+	<body>
+		<input type='text' style='width: 100%;' id='tf' onkeyup='if (event.keyCode == 13) { draw_tree(); save_current(); } else if(event.keyCode == (20 + 7)) this.value = "";' placeholder="Enter array representation of your tree .. to indicate an element is not-a-node use . symbol (dot) .. use /bN to have N-ary splits .."/>
+		<div id='output' class='hideAna'>
+			<br id='bottom' />
+		</div>
+        <script>
+            tf_values = [];
+            const NULL = '\u2205'; // phi char
+            var ref_kid = bottom;
+            class node {
+                constructor( val ) {
+                    this.value = val;
+                    this.p = null; // parent
+                    this.c = []; // children
+                    this.ci = 0; // child index in parent's children array
+                    this.cp = 0; // child pointer
+                    this.x = 0; // x co-ordinate
+                    this.y = 0; // y co-ordinate
+                    this.lmx = null; // left most child's x .. 1st time un-updated after that keep same
+                    this.rmx = null; // right most child's x .. update for every right child
+                    this.lmc = null;
+                    this.rmc = null;
+                }
+            }
+            var PN = paint_nulls = true;
+            var PR = print_ranges = false;
+            var tree_num_counter = 0;
+            var SPLIT_LIM = Number.NEGATIVE_INFINITY;
+            var SPLIT_LIM = Number.POSITIVE_INFINITY;
+            var SPLIT_LIM = 27;
+			function draw_tree( tree_num = '' ) {
+                tree_num_counter++;
+                if( tree_num == '' ) tree_num = tree_num_counter;
+                if ( tf.value.length == 0 ) return;
+                var arr = tf.value.split( ' ' );
+                var B = 2;
+                if ( arr[ arr.length - 1 ][ 0 ] == '/' ) {
+                    var splits = arr[ arr.length - 1 ].substr( 1 ).split( '/' );
+                    for( var i = 0; i < splits.length; i++ ) {
+                        switch( splits[ i ][ 0 ] ) {
+                            case 'b':
+                                B = parseInt( splits[ i ].substr( 1 ) );
+                                break;
+                            case 'h':
+                            case 'H':
+                                PN = false;
+                                break;
+                            case 's':
+                            case 'S':
+                                PN = true;
+                                break;
+                            case 'l':
+                            case 'L':
+                                SPLIT_LIM = parseInt( splits[ i ].substr( 1 ) );
+                                break;
+                        }
+                    }
+                    arr.pop();
+                }
+                arr = arr.join( ' ' );
+
+                var r = arr.split( ' ' ).map( function( val ) { return val == '.' ? ( PN ? new node( '' ) : null ) : new node( val ); } );
+                /*
+                // foll height h formula is taken from https://en.wikipedia.org/wiki/K-ary_tree
+                    here, nP means n**p or n^p or n power p
+                    here, n0 + n1 + n2 + ... + nH = S
+                    thus, n1 + n2 + n3 + ... + nH+1 = Sn
+                    thus, Sn - S = nH+1 - n0
+                    thus, S(n - 1) = nH+1 - 1
+                    thus, S(n - 1) + 1 = nH+1
+                    thus, logn(S(n - 1) + 1) = H+1
+                    thus, H = logn(S(n - 1) + 1) - 1
+
+                    check foll progs:
+                    /cygdrive/c/Users/adandecha/Documents/AD/Books/3 py/progs/n-ary-trees-height.py
+                    /cygdrive/c/Users/adandecha/Documents/AD/Books/3 py/progs/treeer.py
+                    /cygdrive/c/Users/adandecha/Documents/AD/Books/3 py/progs/treeer.sh
+                    /cygdrive/c/Users/adandecha/Documents/AD/Books/3 py/progs/treeer
+                */
+                // function log( var a, var b ) { return Math.log( a ) / Math.log( b ); }; // var not valid
+                var logn; // will give log of a number (1st arg) wrt base n (2nd arg)
+                logn = function( a, n ) { return Math.log( a ) / Math.log( n ); }; // inaccurate idky
+                logn = function( a, n ) { return Math.log2( a ) / Math.log2( n ); };
+                var h = Math.ceil( logn( r.length * ( B - 1 ) + 1, B ) - 1 );
+                // foll nnft is number of nodes in full tree .. formula is Sigma(i|0,n)k^i = k^(n+1)-1/k-1
+                // here k=B sum is Br0+Br1+..+Brh= (Br(h+1)-1)/(B-1)
+                // https://math.stackexchange.com/a/205704
+                var nnft = ( Math.pow( B, h + 1 ) - 1 ) / ( B - 1 );
+                for( var i = r.length; i < nnft; i++ ) r[ i ] = PN ? new node( '' ) : null;
+                // info( r );
+
+				var CV_tree = document.createElement( "canvas" );
+				output.insertBefore( CV_tree, ref_kid );
+				CV_tree.setAttribute( "style", "border: 0px solid black;" );
+                ref_kid = CV_tree;
+				var anHr = document.createElement("diV");
+				anHr.setAttribute("class", "anHr");
+				output.insertBefore( anHr, ref_kid );
+                ref_kid = anHr;
+
+				//calc longest label's length
+				var longest_label = r.reduce( function( a, b ) {
+                        if( a == null ) a = { 'value' : '' };
+                        if( b == null ) b = { 'value' : '' };
+                        return a.value.length > b.value.length ? a : b;
+                    }, { 'value' : '' } ).value;
+
+				var c = CV_tree.getContext("2d");
+				var font_size = 27;
+				var font_data = font_size + "px Arial Unicode MS";
+				var font_data = font_size + "px Consolas";
+				c.font = font_data;
+                // seems like the foll is giving lengthier hori pixel length than to what appears horizontally wrt canvases y coords
+                // so dividing by 1.5 .. if i divide by 2 then for tree: 1 1234 1234 /b2 it will put both children next to each other!
+                // so either above 2 lines are fact or my adjustments in xy-coords-calc is adding twice somehow somewhere!! GCTL
+				const MAXL = c.measureText(longest_label).width;
+				// const MIDV = min_internode_distance_v = 40 + B * MAXL;
+				// const MIDH = min_internode_distance_h = 7 + MAXL;
+				const MIDV = min_internode_distance_v = MAXL + 70;
+				const MIDH = min_internode_distance_h = Math.max(MAXL * .5, 20); // by 2 bcoz i am center aligning .. still doesn't make sense to me unless i am adding my left sigblings x coord plus inter node dist .. ok! which i am doing so ok!
+                // just need to make sure that i put lines first then circles to cut prettily the lines and then the eles!
+                // so now that i think about it i don't think i need to calc widest str width or anything and just like how i am printing the array
+                // i can just keep a constant distance between the elements .. but yeah no .. what if wider string are not in leaves but upper levels
+                // then i need to adjust and come down to propagate the adjustment so what i am doing is right only ..
+
+                r[ 0 ].p = null;
+                for( var i = 0, lc, rc; i < r.length; i++ ) {
+                    if( r[ i ] == null ) continue;
+                    for( var b = 1; b <= B; b++ ) {
+                        var ci = B * i + b;
+                        var ch = ci < r.length ? r[ ci ] : null;
+                        r[ i ].c.push( ch );
+                        if ( ch != null ) {
+                            ch.ci = r[ i ].c.length - 1;
+                            ch.p = r[ i ];
+                        }
+                    }
+                    r[ i ].cp = 0;
+                }
+
+                // level order traversal for binding left right siblings
+                var level = [r[0]];
+                while (level.length != 0) {
+                    for (var i = 1; i < level.length; i++) if (level[i] != null) level[i].lmc = level[i - 1];
+                    for (var i = 0; i < level.length - 1; i++) if (level[i] != null) level[i].rmc = level[i + 1];
+                    var level_tmp = [];
+                    for (var j = 0; j < level.length; j++) if (level[j] != null) Array.prototype.push.apply(level_tmp, level[j].c);
+                    level = level_tmp;
+                }
+
+				cn = r[0];
+				cn.x = MIDH;
+                cn.y = MIDV;
+				VH = 2 * MIDV; // Vertical height
+				while (r[0].cp < r[0].c.length) {
+                    if (cn.cp < cn.c.length) {
+                        if( cn.c[cn.cp] != null ) {
+                            cn = cn.c[cn.cp];
+                            if( cn.p.rmx == null ) cn.p.rmx = cn.p.x - MIDH; // subtract as below it adds again
+                            cn.x = cn.p.rmx += MIDH;
+                            cn.y = cn.p.y + MIDV;
+                            if( cn.p.lmx == null ) cn.p.lmx = cn.x;
+                            if( cn.y == VH ) VH += MIDV;
+                        } else {
+                            cn.cp++;
+                            if( cn.rmx == null ) cn.rmx = cn.x - MIDH;
+                            cn.rmx += MIDH;
+                            if( cn.lmx == null ) cn.lmx = cn.x;
+                            if( cn.y == VH ) VH += MIDV;
+                        }
+                    } else {
+                        cn.x = ( cn.lmx + cn.rmx ) / 2;
+                        cn.p.rmx = cn.rmx;
+                        cn = cn.p;
+                        cn.cp++;
+                    }
+                    console.log( 'node#' + cn.value + ', x: ' + cn.x + ', y: ' + cn.y );
+				}
+
+				cn = r[0];
+                cn.x = ( cn.lmx + cn.rmx ) / 2;
+
+				CV_tree.height = VH + MIDV; // MIDV to add array label
+				CV_tree.width = r[0].rmx + MIDH;
+				CV_tree.width *= 2; // as last level may contain double
+                // .. the total elements in arr and we're printing arr
+
+                /*
+                // just messing around ^.^
+                // printing the tree vertically x'D
+                for( var i = 0; i < r.length; i++ ) {
+                    var temp = r[i].x
+                    r[i].x = r[i].y
+                    r[i].y = temp;
+                }
+                */
+
+                /////////
+                // lines
+                /////////
+				for (i = 0; i < r.length; ++i) {
+					for (var j = 0; r[ i ] != null && j < r[i].c.length; ++j) {
+                        if( r[i].c[j] != null ) {
+                            c.strokeStyle = c.fillStyle = "darkgray";
+                            c.lineWidth = 2;
+                            c.beginPath();
+                            c.moveTo(r[i].x, r[i].y);
+                            c.lineTo(r[i].c[j].x, r[i].c[j].y);
+                            c.stroke();
+                        }
+                        if( r[i].rmc != null ) {
+                            c.setLineDash([2, 2]);
+                            c.strokeStyle = c.fillStyle = "lightgray";
+                            c.lineWidth = 2;
+                            c.beginPath();
+                            c.moveTo(r[i].x, r[i].y);
+                            c.lineTo(r[i].rmc.x, r[i].rmc.y);
+                            c.stroke();
+                            c.setLineDash([]);
+                        }
+					}
+				}
+
+                ////////////////////////////
+                // circles the line cutters
+                ////////////////////////////
+				c.lineWidth = 1;
+				c.textAlign = "center";
+				c.textBaseline = "middle";
+                var font_size_by2 = parseInt( font_size / 2 );
+                var font_label = font_size_by2 + "px Arial Unicode MS";
+				for (i = 0; i < r.length; ++i) {
+
+                    if( r[ i ] == null ) continue;
+					var a_node = r[i];
+					var x      = a_node.x;
+					var y      = a_node.y;
+
+					c.beginPath();
+					// draw white circle above line meetings
+					c.strokeStyle = c.fillStyle = "white";
+					c.arc(x, y, font_size >> 1, 0, 2 * Math.PI, true);
+					c.stroke();
+					c.fill();
+
+					c.arc( x, y + font_size_by2 + 4, font_size_by2 >> 1, 0, 2 * Math.PI, true );
+					c.stroke();
+					c.fill();
+                }
+
+				////////
+                // eles
+				////////
+				for (i = 0; i < r.length; ++i) {
+
+                    if( r[ i ] == null ) continue;
+					var a_node = r[i];
+					var x      = a_node.x;
+					var y      = a_node.y;
+
+                    c.strokeStyle = c.fillStyle = "black"; // set black
+                    c.font = font_data;
+                    c.strokeText(a_node.value, x, y);
+                    c.fillText(a_node.value, x, y);
+
+					c.strokeStyle = c.fillStyle = "blue";
+                    c.font = font_label;
+                    var label = '' + i;
+                    c.strokeText( label, x, y + font_size_by2 + 4 );
+                    c.fillText( label, x, y + font_size_by2 + 4 );
+                }
+
+                // paint the label saying what was the array ..
+                // var nullified_tfv = arr.replace( /\./g, NULL );
+                /*
+                maintain identical inter word distance so keep left aligned and add prev word's width to last X coord
+                their label should be placed below them but center aligned so lastX + above words mid X and center align
+                */
+                var lastx = MIDH;
+                c.font = font_data;
+                for( var i = 0, line2 = false, lasty = 0; i < r.length; i++ ) {
+                    if (SPLIT_LIM < r.length && !line2 && (r.length >> 1) < i) {
+                        line2 = true;
+                        lastx = MIDH;
+                        lasty = MIDH * 2;
+                    }
+                    c.textAlign = "left";
+                    c.strokeStyle = c.fillStyle = "black";
+                    c.strokeText( r[ i ].value == '' ? NULL : r[ i ].value, lastx, lasty + VH );
+                    c.fillText(   r[ i ].value == '' ? NULL : r[ i ].value, lastx, lasty + VH );
+                    var w = c.measureText( r[ i ].value == '' ? NULL : r[i].value ).width;
+                    c.font = font_label;
+                    c.strokeStyle = c.fillStyle = "blue";
+                    c.textAlign = "center";
+                    c.strokeText( i, lastx + (w / 2), lasty + VH + font_size_by2 + 4 );
+                    c.fillText(   i, lastx + (w / 2), lasty + VH + font_size_by2 + 4 );
+                    c.font = font_data;
+                    lastx += 27 + w;
+                }
+                // CV_tree.width = lastx; // cannot set again! idky!
+				c.textAlign = "left";
+                c.font = font_data;
+                c.strokeStyle = c.fillStyle = "black";
+                c.strokeText( '#' + tree_num, 7, 20 );
+                c.fillText(   '#' + tree_num, 7, 20 );
+			}
+            function repeat( str, count = 1 ) {
+                var temp = '' + str;
+                for( var k = 1; k < count; k++ )
+                    temp += str;
+                return temp;
+            }
+            function spacify( width, str, alignment = 'RIGHT', space = ' ' ) {
+                str = '' + str;
+                var spaces = '';
+                switch( alignment.toUpperCase(  ) )
+                {
+                    case 'LEFT':
+                        for( var i = str.length - 1; i < width; i++ )
+                            spaces += space;
+                        return str + spaces;
+                    case 'MIDDLE':
+                        for( var i = str.length - 1; i < width >> 1; i++ )
+                            spaces += space;
+                        return spaces + str + spaces + ( width & 1 === 1 ? space : '' );
+                    default:
+                    case 'RIGHT':
+                        for( var i = str.length - 1; i < width; i++ )
+                            spaces += space;
+                        return spaces + str;
+                }
+            }
+            function info( obj_name, idx_arr = true ) {
+                try {
+                    if( idx_arr && eval( obj_name ) instanceof Array )
+                        console.log(
+                            obj_name,
+                            JSON.stringify(
+                                eval( obj_name ).reduce(
+                                    function( dict, ele )
+                                    {
+                                        dict[ Object.keys( dict ).length ] = ele;
+                                        return dict;
+                                    },
+                                    {  } // this is passed as dict arg to above func and arr's ele's are passed as ele arg
+                                ),
+                                null,
+                                2
+                            )
+                        );
+                    else
+                        console.log( obj_name, JSON.stringify( eval( obj_name ), null, 2 ) );
+                } catch( e ) {
+                    console.log( JSON.stringify( obj_name, null, 2 ) );
+                }
+            }
+            function save_current() {
+                if( tf_values.indexOf( tf.value ) >= 0 ) return;
+                tf_values.push( tf.value );
+                location.hash = encodeURIComponent( tf_values.join( '\n' ) );
+            }
+            function load_hash() {
+                hash = decodeURIComponent( location.hash ).substr( 1 );
+                if( hash.length == 0 ) {
+                    tf_values = [ '0 1 2 3 4 5 6 7 8 9 10 . 12 /b3' ];
+                } else {
+                    tf_values = hash.split( '\n' );
+                }
+                for( var i = 0; i < tf_values.length; i++ ) {
+                    var tf_value = tf_values[i];
+                    tf.value = tf_value;
+                    draw_tree( i );
+                }
+            }
+            function clear_hash() {
+                location.hash = '';
+                // location.reload();
+            }
+            var window_loaded = false;
+            window.onload = function(  ) {
+                window_loaded = true;
+                tf.focus();
+                load_hash();
+                window.onkeyup = function( e ) {
+                    switch( e.keyCode ) {
+                        case 13:
+                            tf.focus();
+                            break;
+                    }
+                }
+                document.body.onkeydown = function( e ) {
+                    switch( e.keyCode ) {
+                        case 67: // alt-C processing
+                            if( !e.altKey ) break;
+                            clear_hash();
+                            tf.value = '';
+                            tf_values = [];
+                            output.innerHTML = "<br id='bottom' />";
+                            ref_kid = bottom;
+                            tree_num_counter = 0;
+                            break;
+                    }
+                }
+            };
+        </script>
+	</body>
+</html>
